@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CLIENT
+  AGENT
+  ADMIN
+}
+
+enum StatutUtilisateur {
+  ACTIF
+  INACTIF
+  SUSPENDU
+}
+
+enum StatutDemande {
+  EN_ATTENTE
+  DOCUMENTS_MANQUANTS
+  DOSSIER_COMPLET
+  EN_TRAITEMENT
+  RENDEZ_VOUS
+  TERMINE
+}
+
+enum StatutDocument {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+}
+
+enum StatutRendezVous {
+  PROGRAMME
+  CONFIRME
+  ANNULE
+  TERMINE
+}
+
+model User {
+  id           String            @id @default(uuid())
+  nom          String
+  prenom       String
+  email        String            @unique
+  telephone    String?
+  motDePasse   String
+  photo        String?
+  adresse      String?
+  role         Role              @default(CLIENT)
+  statut       StatutUtilisateur @default(ACTIF)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  demandes          Demande[]      @relation("ClientDemandes")
+  demandesAffectees Demande[]      @relation("AgentDemandes")
+  rendezVous        RendezVous[]   @relation("AgentRendezVous")
+  commentaires      Commentaire[]
+  notifications     Notification[]
+  historiques       Historique[]   @relation("ModifiePar")
+
+  @@map("users")
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  nom         String
+  description String
+  delai       String?
+  prix        Decimal? @db.Decimal(10, 2)
+  icone       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documentsRequis ServiceDocument[]
+  demandes        Demande[]
+
+  @@map("services")
+}
+
+model ServiceDocument {
+  id          String   @id @default(uuid())
+  serviceId   String
+  nomDocument String
+  obligatoire Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  service          Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  demandeDocuments DemandeDocument[]
+
+  @@map("service_documents")
+}
+
+model Demande {
+  id            String        @id @default(uuid())
+  clientId      String
+  serviceId     String
+  agentId       String?
+  numeroDossier String        @unique
+  statut        StatutDemande @default(EN_ATTENTE)
+  commentaire   String?
+  dateDepot     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  client  User    @relation("ClientDemandes", fields: [clientId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
+  agent   User?   @relation("AgentDemandes", fields: [agentId], references: [id])
+
+  documents    DemandeDocument[]
+  rendezVous   RendezVous[]
+  commentaires Commentaire[]
+  historiques  Historique[]
+
+  @@map("demandes")
+}
+
+model DemandeDocument {
+  id                String         @id @default(uuid())
+  demandeId         String
+  serviceDocumentId String
+  nomOriginal       String
+  nomFichier        String
+  type              String?
+  taille            Int?
+  url               String
+  statut            StatutDocument @default(EN_ATTENTE)
+  createdAt         DateTime       @default(now())
+
+  demande         Demande         @relation(fields: [demandeId], references: [id], onDelete: Cascade)
+  serviceDocument ServiceDocument @relation(fields: [serviceDocumentId], references: [id])
+
+  @@map("demande_documents")
+}
+
+model RendezVous {
+  id        String           @id @default(uuid())
+  demandeId String
+  agentId   String
+  date      DateTime
+  heure     String
+  lieu      String?
+  motif     String?
+  statut    StatutRendezVous @default(PROGRAMME)
+  createdAt DateTime         @default(now())
+
+  demande Demande @relation(fields: [demandeId], references: [id], onDelete: Cascade)
+  agent   User    @relation("AgentRendezVous", fields: [agentId], references: [id])
+
+  @@map("rendez_vous")
+}
+
+model Commentaire {
+  id        String   @id @default(uuid())
+  demandeId String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+
+  demande Demande @relation(fields: [demandeId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("commentaires")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  titre     String
+  contenu   String
+  lu        Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Historique {
+  id            String   @id @default(uuid())
+  demandeId     String
+  ancienStatut  String?
+  nouveauStatut String
+  modifieParId  String?
+  createdAt     DateTime @default(now())
+
+  demande    Demande @relation(fields: [demandeId], references: [id], onDelete: Cascade)
+  modifiePar User?   @relation("ModifiePar", fields: [modifieParId], references: [id])
+
+  @@map("historiques")
+}
+
+model Parametre {
+  id            String  @id @default(uuid())
+  nomEntreprise String
+  telephone     String?
+  email         String?
+  adresse       String?
+  logo          String?
+
+  @@map("parametres")
+}
